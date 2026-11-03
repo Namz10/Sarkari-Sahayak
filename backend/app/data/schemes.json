@@ -1,0 +1,161 @@
+{
+  "version": "2026-11-03.1",
+  "verified_on": "2026-11-03",
+  "schemes": [
+    {
+      "id": "pmjay",
+      "name": {"en": "Ayushman Bharat PM-JAY", "hi": "आयुष्मान भारत पीएम-जेएवाई"},
+      "level": "central", "states": null, "category": "health",
+      "summary_en": "Free hospital treatment up to ₹5 lakh per family per year at empanelled hospitals.",
+      "benefit": {"kind": "cover", "amount_inr": 500000, "label_en": "₹5 lakh/year family health cover", "counts_in_pocket": true},
+      "rules": [
+        {"id": "on_list", "field": "in_pmjay_list", "op": "is_true", "hard": true, "label_en": "Household is on the PM-JAY eligibility list (check pmjay.gov.in or call 14555)"}
+      ],
+      "required_docs": ["aadhaar", "ration_card"], "optional_docs": [],
+      "how_to_apply_en": "Check your name at pmjay.gov.in or call 14555; if listed, get the Ayushman card at a CSC or empanelled hospital with Aadhaar and ration card.",
+      "apply_url": "https://pmjay.gov.in", "helpline": "14555",
+      "source_url": "https://pmjay.gov.in", "last_verified": "unverified"
+    },
+    {
+      "id": "e_shram",
+      "name": {"en": "e-Shram Card", "hi": "ई-श्रम कार्ड"},
+      "level": "central", "states": null, "category": "labour",
+      "summary_en": "National ID for unorganised workers with ₹2 lakh accident insurance.",
+      "benefit": {"kind": "cover", "amount_inr": 200000, "label_en": "₹2 lakh accident cover", "counts_in_pocket": true},
+      "rules": [
+        {"id": "age", "field": "age", "op": "between", "value": [16, 59], "hard": true, "label_en": "Age 16–59"},
+        {"id": "informal", "field": "is_informal_worker", "op": "is_true", "hard": true, "label_en": "Works in the unorganised sector"},
+        {"id": "nopf", "field": "is_epfo_esic_nps_member", "op": "is_false", "hard": true, "label_en": "Not an EPFO/ESIC/NPS member"},
+        {"id": "notax", "field": "is_income_tax_payer", "op": "is_false", "hard": true, "label_en": "Not an income-tax payer"}
+      ],
+      "required_docs": ["aadhaar", "bank_passbook"], "optional_docs": [],
+      "how_to_apply_en": "Register free at eshram.gov.in or any CSC with Aadhaar and a mobile linked to Aadhaar.",
+      "apply_url": "https://eshram.gov.in", "helpline": "14434",
+      "source_url": "https://eshram.gov.in", "last_verified": "unverified"
+    },
+    {
+      "id": "apy",
+      "name": {"en": "Atal Pension Yojana", "hi": "अटल पेंशन योजना"},
+      "level": "central", "states": null, "category": "pension",
+      "summary_en": "Guaranteed monthly pension of ₹1,000–5,000 from age 60 for a small monthly contribution.",
+      "benefit": {"kind": "monthly", "amount_inr": 5000, "label_en": "Up to ₹5,000/month pension from age 60", "counts_in_pocket": false},
+      "rules": [
+        {"id": "age", "field": "age", "op": "between", "value": [18, 40], "hard": true, "label_en": "Age 18–40"},
+        {"id": "bank", "field": "has_bank_account", "op": "is_true", "hard": true, "label_en": "Has a bank account"},
+        {"id": "notax", "field": "is_income_tax_payer", "op": "is_false", "hard": true, "label_en": "Not an income-tax payer"}
+      ],
+      "required_docs": ["aadhaar", "bank_passbook"], "optional_docs": [],
+      "how_to_apply_en": "Visit your bank branch or net banking and enrol with Aadhaar; contributions auto-debit monthly.",
+      "apply_url": "https://www.jansuraksha.gov.in", "helpline": null,
+      "source_url": "https://www.jansuraksha.gov.in", "last_verified": "unverified"
+    },
+    {
+      "id": "pmsby",
+      "name": {"en": "PM Suraksha Bima Yojana", "hi": "प्रधानमंत्री सुरक्षा बीमा योजना"},
+      "level": "central", "states": null, "category": "insurance",
+      "summary_en": "₹2 lakh accident death/disability cover for about ₹20 a year.",
+      "benefit": {"kind": "cover", "amount_inr": 200000, "label_en": "₹2 lakh accident cover (~₹20/yr)", "counts_in_pocket": true},
+      "rules": [
+        {"id": "age", "field": "age", "op": "between", "value": [18, 70], "hard": true, "label_en": "Age 18–70"},
+        {"id": "bank", "field": "has_bank_account", "op": "is_true", "hard": true, "label_en": "Has a bank account"}
+      ],
+      "required_docs": ["aadhaar", "bank_passbook"], "optional_docs": [],
+      "how_to_apply_en": "Enrol at your bank branch or net banking with Aadhaar; premium auto-debits yearly.",
+      "apply_url": "https://www.jansuraksha.gov.in", "helpline": null,
+      "source_url": "https://www.jansuraksha.gov.in", "last_verified": "unverified"
+    },
+    {
+      "id": "pmjjby",
+      "name": {"en": "PM Jeevan Jyoti Bima Yojana", "hi": "प्रधानमंत्री जीवन ज्योति बीमा योजना"},
+      "level": "central", "states": null, "category": "insurance",
+      "summary_en": "₹2 lakh life cover for about ₹436 a year.",
+      "benefit": {"kind": "cover", "amount_inr": 200000, "label_en": "₹2 lakh life cover (~₹436/yr)", "counts_in_pocket": true},
+      "rules": [
+        {"id": "age", "field": "age", "op": "between", "value": [18, 50], "hard": true, "label_en": "Age 18–50"},
+        {"id": "bank", "field": "has_bank_account", "op": "is_true", "hard": true, "label_en": "Has a bank account"}
+      ],
+      "required_docs": ["aadhaar", "bank_passbook"], "optional_docs": [],
+      "how_to_apply_en": "Enrol at your bank branch or net banking with Aadhaar; premium auto-debits yearly.",
+      "apply_url": "https://www.jansuraksha.gov.in", "helpline": null,
+      "source_url": "https://www.jansuraksha.gov.in", "last_verified": "unverified"
+    },
+    {
+      "id": "pmmvy",
+      "name": {"en": "PM Matru Vandana Yojana", "hi": "प्रधानमंत्री मातृ वंदना योजना"},
+      "level": "central", "states": null, "category": "maternity",
+      "summary_en": "Cash support for pregnant and lactating mothers, paid in instalments.",
+      "benefit": {"kind": "one_time", "amount_inr": 5000, "label_en": "₹5,000 in instalments", "counts_in_pocket": true},
+      "rules": [
+        {"id": "female", "field": "is_female", "op": "is_true", "hard": true, "label_en": "Woman"},
+        {"id": "pregnant", "field": "pregnant_or_lactating", "op": "is_true", "hard": true, "label_en": "Pregnant or breastfeeding"},
+        {"id": "first_child", "field": "num_children", "op": "lte", "value": 1, "hard": false, "label_en": "First living child (check rules for a second girl child)"}
+      ],
+      "required_docs": ["aadhaar", "bank_passbook", "mcp_card"], "optional_docs": [],
+      "how_to_apply_en": "Register at your Anganwadi centre or ASHA worker with Aadhaar, bank passbook and MCP card.",
+      "apply_url": "https://wcd.gov.in", "helpline": null,
+      "source_url": "https://wcd.gov.in", "last_verified": "unverified"
+    },
+    {
+      "id": "pm_kisan",
+      "name": {"en": "PM-KISAN", "hi": "पीएम-किसान"},
+      "level": "central", "states": null, "category": "farmer",
+      "summary_en": "₹6,000 a year in three instalments for landholding farmer families.",
+      "benefit": {"kind": "yearly", "amount_inr": 6000, "label_en": "₹6,000/year", "counts_in_pocket": true},
+      "rules": [
+        {"id": "land", "field": "owns_farmland", "op": "is_true", "hard": true, "label_en": "Owns cultivable farmland"},
+        {"id": "notax", "field": "is_income_tax_payer", "op": "is_false", "hard": true, "label_en": "Not an income-tax payer"}
+      ],
+      "required_docs": ["aadhaar", "bank_passbook", "land_record"], "optional_docs": [],
+      "how_to_apply_en": "Register at pmkisan.gov.in, a CSC, or via your village patwari/agriculture officer.",
+      "apply_url": "https://pmkisan.gov.in", "helpline": "155261",
+      "source_url": "https://pmkisan.gov.in", "last_verified": "unverified"
+    },
+    {
+      "id": "ignoaps",
+      "name": {"en": "Indira Gandhi National Old Age Pension", "hi": "इंदिरा गांधी राष्ट्रीय वृद्धावस्था पेंशन"},
+      "level": "central", "states": null, "category": "pension",
+      "summary_en": "Monthly pension for BPL elders: ₹200 central share at 60–79, ₹500 at 80+; states often add a top-up.",
+      "benefit": {"kind": "monthly", "amount_inr": 200, "label_en": "₹200/month central pension (₹500 at 80+; states top up)", "counts_in_pocket": true},
+      "rules": [
+        {"id": "senior", "field": "has_senior_in_household", "op": "is_true", "hard": true, "label_en": "A household member is aged 60 or above"},
+        {"id": "bpl", "field": "is_bpl", "op": "is_true", "hard": true, "label_en": "Household is Below Poverty Line (BPL)"}
+      ],
+      "required_docs": ["aadhaar", "age_proof", "ration_card"], "optional_docs": ["bank_passbook"],
+      "how_to_apply_en": "Apply at your Gram Panchayat, block office or urban local body with Aadhaar, age proof and BPL ration card.",
+      "apply_url": "https://nsap.nic.in", "helpline": null,
+      "source_url": "https://nsap.nic.in", "last_verified": "2026-11-03"
+    },
+    {
+      "id": "ladli_behna",
+      "name": {"en": "Mukhyamantri Ladli Behna Yojana", "hi": "मुख्यमंत्री लाड़ली बहना योजना"},
+      "level": "state", "states": ["MP"], "category": "women",
+      "summary_en": "₹1,500 a month for women aged 21–60 in Madhya Pradesh with family income under ₹2.5 lakh.",
+      "benefit": {"kind": "monthly", "amount_inr": 1500, "label_en": "₹1,500/month", "counts_in_pocket": true},
+      "rules": [
+        {"id": "female", "field": "is_female", "op": "is_true", "hard": true, "label_en": "Woman"},
+        {"id": "age", "field": "age", "op": "between", "value": [21, 59], "hard": true, "label_en": "Age 21 to under 60"},
+        {"id": "income", "field": "annual_income_inr", "op": "lte", "value": 249999, "hard": true, "label_en": "Family income below ₹2.5 lakh/year"}
+      ],
+      "required_docs": ["aadhaar", "bank_passbook"], "optional_docs": ["domicile_certificate"],
+      "how_to_apply_en": "Apply at your ward/gram panchayat camp or Anganwadi with Aadhaar, Samagra ID and a DBT-linked bank account in your own name.",
+      "apply_url": "https://cmladlibahna.mp.gov.in", "helpline": "0755-2700800",
+      "source_url": "https://cmladlibahna.mp.gov.in", "last_verified": "2026-11-03"
+    },
+    {
+      "id": "majhi_ladki_bahin",
+      "name": {"en": "Mukhyamantri Majhi Ladki Bahin Yojana", "hi": "मुख्यमंत्री माझी लाडकी बहीण योजना"},
+      "level": "state", "states": ["MH"], "category": "women",
+      "summary_en": "₹1,500 a month for women aged 21–65 in Maharashtra with family income up to ₹2.5 lakh.",
+      "benefit": {"kind": "monthly", "amount_inr": 1500, "label_en": "₹1,500/month", "counts_in_pocket": true},
+      "rules": [
+        {"id": "female", "field": "is_female", "op": "is_true", "hard": true, "label_en": "Woman"},
+        {"id": "age", "field": "age", "op": "between", "value": [21, 65], "hard": true, "label_en": "Age 21–65"},
+        {"id": "income", "field": "annual_income_inr", "op": "lte", "value": 250000, "hard": true, "label_en": "Family income up to ₹2.5 lakh/year"}
+      ],
+      "required_docs": ["aadhaar", "bank_passbook"], "optional_docs": ["income_certificate", "ration_card", "domicile_certificate"],
+      "how_to_apply_en": "Apply at ladakibahin.maharashtra.gov.in with Aadhaar, an Aadhaar-linked bank account, domicile proof and income certificate or yellow/orange ration card; complete eKYC.",
+      "apply_url": "https://ladakibahin.maharashtra.gov.in", "helpline": null,
+      "source_url": "https://ladakibahin.maharashtra.gov.in/scheme-information", "last_verified": "2026-11-03"
+    }
+  ]
+}

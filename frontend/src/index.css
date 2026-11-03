@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { background: #0A0B10; color: #F3F4F8; font-family: Inter, 'Noto Sans', 'Noto Sans Devanagari', system-ui, sans-serif; }
+body { background: radial-gradient(ellipse at top, #12131C, #0A0B10 70%); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+.surface { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
+.grad-text { background: linear-gradient(90deg,#7C5CFF,#22D3EE); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.grad-bg { background: linear-gradient(135deg,#7C5CFF,#22D3EE); }
+@keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes scanline { 0% { top: 0; } 100% { top: 100%; } }
+@keyframes pulse2 { 0%,100% { opacity: .6; } 50% { opacity: 1; } }
+@keyframes speak { 0%,100% { transform: scale(1); } 25% { transform: scale(1.08); } 60% { transform: scale(1.03); } }
+@keyframes caret { 50% { opacity: 0; } }
+.breathe { animation: breathe 4s ease-in-out infinite; }
+.speak { animation: speak 0.9s ease-in-out infinite; }
+.spin { animation: spin 2.4s linear infinite; }
+.scanline { position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg,transparent,#22D3EE,transparent); box-shadow: 0 0 18px #22D3EE; animation: scanline 1.6s ease-in-out infinite alternate; }
+.pulse2 { animation: pulse2 1.4s ease-in-out infinite; }
+.caret { animation: caret 1s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) { .breathe, .speak, .spin, .scanline, .pulse2, .caret { animation: none; } }
