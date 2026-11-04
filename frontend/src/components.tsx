@@ -40,8 +40,8 @@ export function Orb() {
         </svg>
         {rec && <span className="absolute h-36 w-36 animate-ping rounded-full border border-cyan/40" />}
         <div ref={ref} className={`relative h-36 w-36 overflow-hidden rounded-full transition-shadow ${playing ? 'speak' : rec ? '' : 'breathe'}`}
-          style={{ background: 'radial-gradient(circle at 30% 30%, #A78BFA, #7C5CFF 45%, #22D3EE 110%)', boxShadow: '0 0 50px rgba(124,92,255,.45)' }}>
-          {busy && <div className="spin absolute -inset-4 opacity-80" style={{ background: 'conic-gradient(from 0deg, #7C5CFF, #22D3EE, #0A0B10, #7C5CFF)', filter: 'blur(8px)' }} />}
+          style={{ background: 'radial-gradient(circle at 30% 30%, #e6c16e, #c66a45 52%, #176b62 115%)', boxShadow: '0 0 36px rgba(23,107,98,.28)' }}>
+          {busy && <div className="spin absolute -inset-4 opacity-80" style={{ background: 'conic-gradient(from 0deg, #176b62, #d9a84f, #e8d6b5, #176b62)', filter: 'blur(8px)' }} />}
           <div className="absolute inset-3 rounded-full" style={{ background: 'radial-gradient(circle at 35% 25%, rgba(255,255,255,.35), transparent 60%)' }} />
           <svg className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 text-white" viewBox="0 0 24 24" fill="currentColor">
             {rec ? <rect x="7" y="7" width="10" height="10" rx="2" /> : <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z" />}

@@ -16,7 +16,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -104,13 +104,14 @@ async def call(fn, *a, retries=3, **kw):
             await asyncio.sleep(1.5 * (2 ** i))
 
 
-def llm_json(system: str, user: str, max_tokens: int = 900) -> dict:
-    # Reasoning tokens count toward max_tokens, so leave generous headroom.
-    budget = max_tokens + 3500
+def llm_json(system: str, user: str, max_tokens: int = 900, model: str = "sarvam-105b") -> dict:
+    # sarvam-105b reasons first and reasoning tokens count toward max_tokens, so leave headroom.
+    # sarvam-105b-conversations does not reason: fast, so it is used for narration.
+    budget = max_tokens + (0 if model.endswith("conversations") else 3500)
     text = ""
     for _ in range(2):
         r = client().chat.completions(
-            model="sarvam-105b",
+            model=model,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             temperature=0.1, max_tokens=budget)
         text = r.choices[0].message.content or ""
@@ -137,6 +138,13 @@ def llm_json(system: str, user: str, max_tokens: int = 900) -> dict:
 def health():
     v = _versions()
     return {"ok": True, "mode": MODE, "spend_inr": round(spend["inr"], 2), "cap_inr": SPEND_CAP, **v}
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Provide a tiny branded icon so browser probes do not create noisy 404s."""
+    icon = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#176b62"/><text x="32" y="43" text-anchor="middle" font-size="31" font-family="serif" font-weight="700" fill="#fffaf0">सा</text></svg>'''
+    return Response(icon, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
 
 
 def _versions():
@@ -288,7 +296,7 @@ async def narrate(req: NarrateReq):
     try:
         d = await asyncio.wait_for(asyncio.to_thread(
             llm_json, NARR_SYS.format(lang=LANGS[code], code=code),
-            "RESULTS: " + json.dumps(compact, ensure_ascii=False) + "\nPOCKET: " + json.dumps(req.pocket), 1100), timeout=40)
+            "RESULTS: " + json.dumps(compact, ensure_ascii=False) + "\nPOCKET: " + json.dumps(req.pocket), 1100, "sarvam-105b-conversations"), timeout=40)
         script = str(d.get("script", ""))[:450]
         card_text = d.get("card_text") or {}
         if not script:
