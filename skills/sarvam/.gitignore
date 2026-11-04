@@ -1,0 +1,7 @@
+.agents/
+skills-lock.json
+demo/
+.specstory/
+.cursorindexingignore
+.env
+.env.*

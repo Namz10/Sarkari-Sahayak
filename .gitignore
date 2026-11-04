@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Sarkari Sahayak application cache & local logs
+.cache/
+*.tmp
+spend.log

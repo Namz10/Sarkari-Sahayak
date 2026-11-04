@@ -5,6 +5,9 @@ Run from the repo root:  py scripts/smoke.py
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 from fastapi.testclient import TestClient  # noqa: E402
@@ -30,4 +33,5 @@ print("narrate:", n.status_code)
 j = n.json()
 print("script:", j.get("script"))
 print("audio bytes(b64 chars):", len(j.get("audio_b64", "")), "degraded:", j.get("degraded"))
-print("spend:", c.get("/api/health").json()["spend_inr"])
+health = c.get("/api/health").json()
+print("spend:", health["spend_inr"], "cache_hits:", health.get("cache", {}).get("hits", 0))

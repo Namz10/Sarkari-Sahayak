@@ -3,33 +3,45 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Dependent(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    relation: str
-    age: Optional[int] = None
+    relation: str = Field(min_length=1, max_length=40)
+    age: Optional[int] = Field(default=None, ge=0, le=130)
     gender: Optional[str] = None
 
 
 class Profile(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    age: Optional[int] = None
+    age: Optional[int] = Field(default=None, ge=0, le=130)
     gender: Optional[str] = None
-    state: Optional[str] = None
-    occupation: Optional[str] = None
-    monthly_income_inr: Optional[int] = None
-    household_size: Optional[int] = None
-    dependents: list[Dependent] = Field(default_factory=list)
+    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
+    occupation: Optional[str] = Field(default=None, max_length=60)
+    monthly_income_inr: Optional[int] = Field(default=None, ge=0, le=10_000_000)
+    household_size: Optional[int] = Field(default=None, ge=1, le=100)
+    dependents: list[Dependent] = Field(default_factory=list, max_length=30)
     pregnant_or_lactating: Optional[bool] = None
     owns_farmland: Optional[bool] = None
     is_income_tax_payer: Optional[bool] = None
     is_epfo_esic_nps_member: Optional[bool] = None
     has_bank_account: Optional[bool] = None
     ration_card_type: Optional[str] = None
-    docs_held: list[str] = Field(default_factory=list)
-    inferred: list[str] = Field(default_factory=list)
+    docs_held: list[str] = Field(default_factory=list, max_length=30)
+    inferred: list[str] = Field(default_factory=list, max_length=30)
+
+    @field_validator("state", mode="before")
+    @classmethod
+    def normalize_state(cls, value: object) -> object:
+        return value.upper().strip() if isinstance(value, str) else value
+
+    @field_validator("docs_held", "inferred", mode="before")
+    @classmethod
+    def unique_strings(cls, value: object) -> object:
+        if not isinstance(value, list):
+            return value
+        return list(dict.fromkeys(str(item).strip() for item in value if str(item).strip()))
 
 
 class LocalizedName(BaseModel):
