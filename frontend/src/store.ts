@@ -104,6 +104,7 @@ export const useStore = create<State>((set, get) => {
     set({ phase: 'UNDERSTANDING', transcript, langCode: lang, narration: null, audioUrl: '' });
     try {
       const r = await api.profile(transcript, lang, newCtrl());
+      if (r.language_code) set({ langCode: r.language_code });
       await match(r.profile, true);
     } catch (e) { set({ phase: 'IDLE' }); fail(e, () => void understand(transcript, lang)); }
   };

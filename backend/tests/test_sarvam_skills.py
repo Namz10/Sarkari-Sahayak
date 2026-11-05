@@ -90,3 +90,16 @@ def test_health_endpoint_includes_cache_stats():
     assert "cache" in data
     assert "hits" in data["cache"]
 
+
+
+def test_resolve_target_language_single_language_rules():
+    from app.main import resolve_target_language
+    # English + Marathi -> Marathi
+    assert resolve_target_language("I work as Rapido driver मला दोन मुलं आहेत", "en-IN") == "mr-IN"
+    # English + Hindi -> Hindi
+    assert resolve_target_language("I live in Indore, meri kheti hai", "en-IN") == "hi-IN"
+    assert resolve_target_language("मैं इंदौर में रहता हूँ", "hi-IN") == "hi-IN"
+    # English + Tamil -> Tamil
+    assert resolve_target_language("I live in Chennai நான் வேலை செய்கிறேன்", "en-IN") == "ta-IN"
+    # Pure English -> English
+    assert resolve_target_language("I work as a driver in Pune and earn 15000 rupees a month.", "en-IN") == "en-IN"

@@ -130,7 +130,7 @@ export const api = {
     return call<Transcribed>('/api/transcribe', { method: 'POST', body: fd, signal });
   },
   profile: (transcript: string, language_code: string, signal?: AbortSignal) =>
-    call<{ profile: Profile; notes: string[] }>('/api/profile', json({ transcript, language_code }, signal)),
+    call<{ profile: Profile; notes: string[]; language_code?: string }>('/api/profile', json({ transcript, language_code }, signal)),
   match: (profile: Profile, docs_held: string[], signal?: AbortSignal) =>
     call<MatchResponse>('/api/match', json({ profile, docs_held }, signal)),
   document: (image: Blob, language_code: string, signal?: AbortSignal) => {

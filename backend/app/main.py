@@ -20,6 +20,7 @@ import io
 import json
 import os
 import random
+import re
 import time
 import zipfile
 from contextlib import asynccontextmanager
@@ -85,6 +86,65 @@ LANGS = {
     "bn-IN": "Bengali", "gu-IN": "Gujarati", "kn-IN": "Kannada", "ml-IN": "Malayalam",
     "pa-IN": "Punjabi", "od-IN": "Odia", "en-IN": "English",
 }
+
+
+def resolve_target_language(
+    text: str,
+    hint_or_code: str | None = None,
+    state: str | None = None,
+) -> str:
+    """Resolve target language adhering to single-language rule:
+    - English + Marathi -> Marathi (mr-IN)
+    - English + Hindi -> Hindi (hi-IN)
+    - English + Other Indic -> That Indic language
+    - Only English -> English (en-IN)
+    """
+    text_clean = text or ""
+
+    # 1. Native Indic non-Devanagari scripts
+    if re.search(r"[\u0B80-\u0BFF]", text_clean):
+        return "ta-IN"
+    if re.search(r"[\u0C00-\u0C7F]", text_clean):
+        return "te-IN"
+    if re.search(r"[\u0980-\u09FF]", text_clean):
+        return "bn-IN"
+    if re.search(r"[\u0A80-\u0AFF]", text_clean):
+        return "gu-IN"
+    if re.search(r"[\u0C80-\u0CFF]", text_clean):
+        return "kn-IN"
+    if re.search(r"[\u0D00-\u0D7F]", text_clean):
+        return "ml-IN"
+    if re.search(r"[\u0A00-\u0A7F]", text_clean):
+        return "pa-IN"
+    if re.search(r"[\u0B00-\u0B7F]", text_clean):
+        return "od-IN"
+
+    # 2. Devanagari script (Marathi vs Hindi)
+    if re.search(r"[\u0900-\u097F]", text_clean):
+        if (
+            "ळ" in text_clean
+            or re.search(r"\b(आहे|आहेत|नाही|माझं|मला|तुम्ही|आम्ही|चालवतो|करतो|राहतो|मुलं|मुलगा|मुलगी|पंधरा|हजार|अडुसष्ठ|चौतीस|आई|वडील)\b", text_clean)
+            or hint_or_code == "mr-IN"
+            or (state and str(state).upper() == "MH")
+        ):
+            return "mr-IN"
+        return "hi-IN"
+
+    # 3. Transliterated / romanized Indic or mixed keywords
+    lower = text_clean.lower()
+    marathi_markers = r"\b(ahe|ahet|nahi|majha|majh|mala|tumhi|aamhi|chalatvo|karto|rahto|mula|mulga|mulgi|adushashtha|chautis|vadil)\b"
+    if re.search(marathi_markers, lower) or (hint_or_code == "mr-IN" or (state and str(state).upper() == "MH" and hint_or_code != "en-IN")):
+        return "mr-IN"
+
+    hindi_markers = r"\b(hai|hain|nahi|mera|meri|mujhe|aap|hum|karta|rahta|rupaye|kisan|kheti|pandrah)\b"
+    if re.search(hindi_markers, lower) or (hint_or_code == "hi-IN" or (state and str(state).upper() in {"MP", "UP", "BR", "RJ"})):
+        return "hi-IN"
+
+    # 4. If an explicit Indic hint or detected code was given
+    if hint_or_code and hint_or_code in LANGS and hint_or_code != "en-IN":
+        return hint_or_code
+
+    return "en-IN"
 
 # Live-verified persona voices (Bulbul v4-flash) from text-to-speech/SKILL.md
 # ml-IN and od-IN have no v4 personas yet, so they route to bulbul:v3 with speaker "shubh".
@@ -354,7 +414,8 @@ async def transcribe(audio: UploadFile = File(...), language_hint: str | None = 
         raise ApiError("empty_audio", "I couldn't hear you clearly. Please try again.", 422, True)
 
     detected = getattr(r, "language_code", None) or lang or "hi-IN"
-    result = {"transcript": transcript, "language_code": detected, "duration_s": dur}
+    resolved_lang = resolve_target_language(transcript, detected, None)
+    result = {"transcript": transcript, "language_code": resolved_lang, "duration_s": dur}
     cache_set("stt", cache_k, result)
     return result
 
@@ -372,16 +433,17 @@ class ProfileReq(BaseModel):
 
 @app.post("/api/profile")
 async def profile(req: ProfileReq):
-    lang = req.language_code if req.language_code in LANGS else "hi-IN"
-    cache_k = hash_key("profile", req.transcript, lang)
+    resolved_lang = resolve_target_language(req.transcript, req.language_code, None)
+    cache_k = hash_key("profile", req.transcript, resolved_lang)
     cached = cache_get("profile", cache_k)
     if cached:
         return cached
 
-    d = await llm_json(PROFILE_SYS, f"Language: {lang}\nTranscript:\n{req.transcript}", 900)
+    d = await llm_json(PROFILE_SYS, f"Language: {resolved_lang}\nTranscript:\n{req.transcript}", 900)
     notes = [str(n) for n in d.pop("notes", [])][:5]
     p = Profile.model_validate({k: v for k, v in d.items() if v is not None})
-    res = {"profile": p.model_dump(), "notes": notes}
+    final_lang = resolve_target_language(req.transcript, resolved_lang, p.state)
+    res = {"profile": p.model_dump(), "notes": notes, "language_code": final_lang}
     cache_set("profile", cache_k, res)
     return res
 
@@ -496,8 +558,18 @@ async def document(image: UploadFile = File(...), language_code: str = Form("en-
     return res
 
 
-NARR_SYS = """You are Sarkari Sahayak, a warm, plain-spoken helper. Write in {lang} ({code}), simple everyday words, as if speaking to one person. Keep scheme names and rupee figures EXACTLY as given (scheme names may stay in English). Use ONLY facts in RESULTS; never add schemes, amounts or claims. For status "confirm" say they should check, not that they qualify. Mention it is indicative and the office decides.
-Output ONLY JSON: {{"script": "<=420 characters, spoken aloud, no emojis/markdown/lists: how many schemes qualify and the headline benefit, the most valuable one and what is missing, one next step>", "card_text": {{"<scheme_id>": {{"why": "<=110 chars", "next_step": "<=110 chars"}}}}}}
+NARR_SYS = """You are Sarkari Sahayak, a warm, plain-spoken helper.
+CRITICAL SINGLE-LANGUAGE ENFORCEMENT:
+- Output MUST be 100% in {lang} ({code}) ONLY.
+- Absolutely NO code-mixing (no Hinglish, no Marathish, no English sentences or mixed phrases).
+- If {code} is mr-IN, output strictly in pure Marathi script and words.
+- If {code} is hi-IN, output strictly in pure Hindi script and words.
+- If {code} is en-IN, output in English.
+- Translate all concepts and terms (e.g. in Marathi: 'बँक पासबुक' not 'bank_passbook', 'अपघात विमा' not 'accident cover', 'आरोग्य संरक्षण' not 'health cover', 'योजना' not 'scheme'; in Hindi: 'बैंक पासबुक', 'दुर्घटना बीमा', 'स्वास्थ्य बीमा', 'योजना').
+- Only official scheme acronyms (like PM-JAY, e-Shram) may stay in Latin letters.
+
+Keep scheme names and rupee figures EXACTLY as given. Use ONLY facts in RESULTS; never add schemes, amounts or claims. For status "confirm" say they should check at the office, not that they qualify. Mention it is indicative and the office decides.
+Output ONLY JSON: {{"script": "<=420 characters, spoken aloud, no emojis/markdown/lists: how many schemes qualify and the headline benefit, the most valuable one and what is missing, one next step in pure {lang}>", "card_text": {{"<scheme_id>": {{"why": "<=110 chars in pure {lang}>", "next_step": "<=110 chars in pure {lang}>"}}}}}}
 Include card_text for every scheme with status eligible, almost or confirm."""
 
 
@@ -524,7 +596,10 @@ def _template(results: list[dict], code: str) -> str:
 @app.post("/api/narrate")
 async def narrate(req: NarrateReq):
     """Generate localized narration script and speech with Bulbul v4-flash & v3 fallback."""
-    code = req.language_code if req.language_code in LANGS else "en-IN"
+    prof_state = req.profile.get("state") if isinstance(req.profile, dict) else None
+    code = resolve_target_language(json.dumps(req.profile), req.language_code, prof_state)
+    if code not in LANGS:
+        code = "en-IN"
     compact = []
     for r in req.results:
         if r["status"] == "not_eligible":
