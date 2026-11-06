@@ -4,10 +4,10 @@
 
 :root { color: #29251f; background: #e8d6b5; font-family: Inter, 'Noto Sans', 'Noto Sans Devanagari', system-ui, sans-serif; }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { min-width: 320px; min-height: 100vh; margin: 0; background: #e8d6b5; color: #29251f; -webkit-font-smoothing: antialiased; }
+html { scroll-behavior: smooth; min-height: 100%; -webkit-text-size-adjust: 100%; }
+body { min-width: 320px; min-height: 100vh; min-height: 100svh; margin: 0; background: #e8d6b5; color: #29251f; -webkit-font-smoothing: antialiased; }
 button, input, select { font: inherit; } button { cursor: pointer; } button:focus-visible, a:focus-visible { outline: 3px solid #176b62; outline-offset: 3px; }
-.app-shell { min-height: 100vh; overflow: hidden; background: radial-gradient(circle at 79% 11%, #f7ecda 0 13rem, transparent 13.2rem), #e8d6b5; }
+.app-shell { min-height: 100vh; min-height: 100svh; overflow: clip; background: radial-gradient(circle at 79% 11%, #f7ecda 0 13rem, transparent 13.2rem), #e8d6b5; }
 .site-header, .home, .portal, .site-footer { width: min(1180px, calc(100% - 48px)); margin-inline: auto; }
 .site-header { height: 86px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(65, 51, 34, .18); }
 .brand { display: inline-flex; gap: 10px; align-items: center; border: 0; background: none; font-weight: 700; font-size: 17px; color: #29251f; }.brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50% 50% 45% 45%; background: #176b62; color: #fffaf0; font: 700 15px Georgia, serif; }
@@ -20,3 +20,11 @@ button, input, select { font: inherit; } button { cursor: pointer; } button:focu
 .site-footer { display: flex; gap: 20px; justify-content: space-between; padding: 20px 0 28px; border-top: 1px solid rgba(65, 51, 34, .18); color: #716654; font-size: 11px; }.site-footer button { border: 0; padding: 0; background: none; color: #176b62; text-decoration: underline; }.fixed .bg-black\/60 { background: rgba(39, 33, 23, .45); }.fixed .bg-\[\#14151D\] { background: #fffaf1; border-color: #c9b793; color: #29251f; }.fixed .\[\&\>option\]\:bg-\[\#14151D\] > option { background: #fffaf1; color: #29251f; }
 @media (max-width: 760px) { .site-header, .home, .portal, .site-footer { width: min(100% - 32px, 580px); }.site-header { height: 72px; }.site-header nav { display: none; }.header-cta { padding: 9px 11px; font-size: 12px; }.hero { grid-template-columns: 1fr; padding: 50px 0 35px; gap: 10px; }.hero h1 { font-size: 43px; }.hero-art { min-height: 305px; }.sun-shape { width: 260px; height: 260px; }.assurance-grid, .portal-grid, .scheme-grid { grid-template-columns: 1fr; }.assurance-grid { gap: 24px; }.assurance { padding: 45px 0; }.portal { padding-top: 35px; }.portal-intro { display: block; }.portal-intro aside { display: inline-block; }.help-panel { min-height: 290px; }.results { margin-top: 45px; }.results-heading, .document-actions, .site-footer { align-items: flex-start; flex-direction: column; }.document-actions > div:last-child { display: flex; gap: 4px; flex-wrap: wrap; }.site-footer { gap: 8px; }.trust-row { flex-wrap: wrap; gap: 8px; }.mini-card-front { left: 0; }.paper-stack { width: 310px; }.listen-panel { padding: 20px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+/* Mobile browser viewport and device-safe-area handling (iOS, Samsung Internet, Chrome). */
+.site-header { padding-top: env(safe-area-inset-top, 0px); }
+.fixed.inset-0 { padding-top: env(safe-area-inset-top, 0px); }
+.fixed.inset-0 > .max-h-\[85vh\] { max-height: 85vh; max-height: 85dvh; padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px)); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.fixed.inset-x-0.bottom-4 { bottom: max(1rem, env(safe-area-inset-bottom, 0px)); }
+input, select, textarea { font-size: max(16px, 1em); }
+button, a { touch-action: manipulation; }
+@media (max-width: 760px) { .site-header { height: calc(72px + env(safe-area-inset-top, 0px)); }.portal { scroll-margin-top: 16px; }.site-footer { padding-bottom: max(28px, env(safe-area-inset-bottom, 0px)); } }
