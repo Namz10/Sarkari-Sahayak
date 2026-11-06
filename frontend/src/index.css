@@ -28,3 +28,28 @@ button, input, select { font: inherit; } button { cursor: pointer; } button:focu
 input, select, textarea { font-size: max(16px, 1em); }
 button, a { touch-action: manipulation; }
 @media (max-width: 760px) { .site-header { height: calc(72px + env(safe-area-inset-top, 0px)); }.portal { scroll-margin-top: 16px; }.site-footer { padding-bottom: max(28px, env(safe-area-inset-bottom, 0px)); } }
+/* Robust narrow-screen layout: prevent grid children and decorative shapes from
+   expanding the document beyond the device viewport. */
+@media (max-width: 760px) {
+  .app-shell { overflow-x: clip; }
+  .site-header, .home, .portal, .site-footer { width: calc(100% - 32px); min-width: 0; }
+  .portal-grid, .portal-grid > *, .listen-panel, .help-panel { min-width: 0; max-width: 100%; }
+  .listen-panel { padding: clamp(16px, 5vw, 22px); }
+  .listen-panel .no-scrollbar { width: calc(100% + 8px); max-width: calc(100vw - 40px); margin-left: -4px; margin-right: -4px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .listen-panel .no-scrollbar::-webkit-scrollbar { display: none; }
+  .listen-panel .flex.flex-wrap.gap-2 { min-width: 0; }
+  .listen-panel .flex.flex-wrap.gap-2 > button { max-width: 100%; }
+  .listen-panel form { min-width: 0; }
+  .listen-panel form input { min-width: 0; width: 0; }
+  .portal-intro h1 { overflow-wrap: anywhere; }
+  .help-panel { min-height: 0; padding: 22px; }
+  .help-symbol { margin-bottom: 22px; }
+  .help-panel h2 { margin-top: 0; }
+  .hero-art { min-width: 0; overflow: hidden; }
+  .paper-stack { max-width: 100%; }
+}
+@media (min-width: 761px) {
+  .site-header, .home, .portal, .site-footer { width: min(1320px, calc(100% - 80px)); }
+  .portal-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 28px; }
+  .listen-panel, .help-panel { padding: clamp(28px, 3vw, 42px); }
+}
