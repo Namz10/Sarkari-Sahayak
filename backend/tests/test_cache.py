@@ -5,9 +5,9 @@ from app.engine.cache import clear, get, get_stats, hash_key, set_val
 
 @pytest.fixture(autouse=True)
 def _reset_cache():
-    clear(clear_disk=True)
+    clear()
     yield
-    clear(clear_disk=True)
+    clear()
 
 
 def test_hash_key_is_deterministic():
@@ -38,3 +38,23 @@ def test_cache_stats_tracking():
     assert stats["misses"] >= 1
     assert stats["hits"] >= 1
     assert stats["writes"] >= 1
+
+
+def test_cache_is_process_local_and_does_not_write_files(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    set_val("privacy", "profile-key", {"name": "Ramesh", "transcript": "private"})
+    assert get("privacy", "profile-key")["name"] == "Ramesh"
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_cache_evicts_least_recently_used_entries(monkeypatch):
+    import app.engine.cache as cache
+
+    monkeypatch.setattr(cache, "_MAX_MEMORY_ITEMS", 2)
+    first, second, third = (hash_key(label) for label in ("first", "second", "third"))
+    set_val("lru", first, {"id": 1})
+    set_val("lru", second, {"id": 2})
+    assert get("lru", first) == {"id": 1}
+    set_val("lru", third, {"id": 3})
+    assert get("lru", second) is None
+    assert get("lru", first) == {"id": 1}

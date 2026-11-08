@@ -2,7 +2,7 @@
 
 > **Tagline:** *Bolo. Dikhao. Suno.* — Speak. Show. Listen.
 > **One-liner:** Your government benefits, explained in your own voice and language.
-> **Doc status:** v1.0 baseline. Last reviewed 2026-11-03. This is the source of truth for the build.
+> **Doc status:** Original v1.0 proposal, last reviewed 2026-11-03. This document is historical and no longer describes every implemented feature or data source. For current behavior, deployment configuration, and recent changes, use [`README.md`](README.md) and [`docs/betterments.md`](docs/betterments.md).
 > **Legend:** `[VERIFY]` marks a fact I could not confirm from docs. Check it during the phase named in §17 before you rely on it.
 
 ---

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { Profile, Result, Totals } from './api';
+import type { Profile, Result } from './api';
 import { getElapsed, getMicLevel, useStore } from './store';
 import { LANGS, OCCUPATIONS, STATES, STATE_OPTIONS, docLabel, inr, reducedMotion } from './lib/util';
 
@@ -162,6 +162,7 @@ function show(p: Profile, k: keyof Profile): string | null {
 
 export function ProfileChips() {
   const profile = useStore((s) => s.profile);
+  const questions = useStore((s) => s.questions);
   const update = useStore((s) => s.updateProfile);
   const [edit, setEdit] = useState<Field | null>(null);
   if (!profile) return null;
@@ -174,6 +175,7 @@ export function ProfileChips() {
   };
   return (
     <div>
+      {questions && <section className="mb-4 rounded-xl border border-cyan/30 bg-cyan/10 p-4 text-sm" aria-live="polite"><p className="font-semibold">{questions.message}</p>{questions.questions.map((question) => <p key={question.id} className="mt-2 text-muted">• {question.text}</p>)}{questions.questions.length > 0 && <p className="mt-3 font-medium text-cyan">Tap the microphone and answer in your own words.</p>}</section>}
       <div className="flex flex-wrap gap-2">
         {chips.filter((c) => c.text || ['age', 'state', 'monthly_income_inr', 'occupation'].includes(c.f.key)).map(({ f, text }) => {
           const inferred = profile.inferred.includes(f.key);
@@ -245,31 +247,22 @@ export function BenefitPocket() {
   const pocket = useStore((s) => s.pocket);
   const matching = useStore((s) => s.matching);
   if (!pocket) return null;
-  const e = pocket.eligible, a = pocket.almost;
-  const parts: [string, number, (n: number) => string][] = [];
-  const add = (t: Totals, tag: string) => {
-    void tag;
-    return t;
-  };
-  add(e, '');
+  const e = pocket.eligible;
   const items: { label: string; v: number; f: (n: number) => string }[] = [];
   if (e.cover) items.push({ label: 'health/life cover', v: e.cover, f: inr });
   if (e.monthly) items.push({ label: 'per month', v: e.monthly, f: (n) => inr(n) });
   if (e.yearly) items.push({ label: 'per year', v: e.yearly, f: inr });
   if (e.one_time) items.push({ label: 'one-time', v: e.one_time, f: inr });
-  void parts;
-  const aTotal = a.cover + a.monthly + a.yearly + a.one_time;
+  if (items.length === 0) return null;
   return (
     <div className="sticky top-0 z-30 -mx-4 px-4 pb-2 pt-2 backdrop-blur-xl" style={{ background: 'linear-gradient(#0A0B10 70%, transparent)' }}>
       <div className={`surface rounded-2xl p-4 ${matching ? 'opacity-70' : ''}`} style={{ boxShadow: '0 0 30px rgba(34,197,94,.18)' }}>
         <p className="text-xs uppercase tracking-wider text-muted">Your benefit pocket · up to</p>
         <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
-          {items.length === 0 && <span className="text-lg text-muted">No confirmed benefits yet</span>}
           {items.map((i) => (
             <span key={i.label} className="text-eligible"><span className="text-2xl font-bold"><CountUp value={i.v} format={i.f} /></span> <span className="text-xs text-muted">{i.label}</span></span>
           ))}
         </div>
-        {aTotal > 0 && <p className="mt-1 text-xs text-almost">+ more unlockable with missing documents</p>}
       </div>
     </div>
   );
@@ -282,46 +275,20 @@ const BADGE: Record<string, { c: string; t: (r: Result) => string }> = {
   not_eligible: { c: 'text-muted bg-white/5', t: () => 'Not eligible' },
 };
 
-export function SchemeCard({ r, i }: { r: Result; i: number }) {
-  const [open, setOpen] = useState(false);
-  const ct = useStore((s) => s.narration?.card_text[r.scheme.id]);
+export function SchemeCard({ r, i, onOpen }: { r: Result; i: number; onOpen: () => void }) {
   const b = BADGE[r.status];
-  const glow = r.status === 'eligible' ? '0 0 24px rgba(34,197,94,.22)' : undefined;
   return (
-    <motion.div layout="position" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-      transition={{ ...spring, delay: Math.min(i, 8) * 0.06 }} className="surface rounded-[20px] p-4" style={{ boxShadow: glow }}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="font-semibold leading-snug">{r.scheme.name.hi}</h3>
-          <p className="text-sm text-muted">{r.scheme.name.en}</p>
-        </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${b.c}`}>{b.t(r)}</span>
-      </div>
-      <p className="mt-2 text-sm font-medium text-cyan">{r.scheme.benefit.label_en}</p>
-      {ct?.why ? <p className="mt-2 text-sm leading-relaxed">{ct.why}</p> : <p className="mt-2 text-sm text-muted">{r.scheme.summary_en}</p>}
-      {ct?.next_step && <p className="mt-1 text-sm text-muted">→ {ct.next_step}</p>}
-      <button onClick={() => setOpen(!open)} className="mt-3 text-xs text-violet" aria-expanded={open}>{open ? 'Hide checklist ▴' : 'Show checklist ▾'}</button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.ul initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mt-2 space-y-1 overflow-hidden text-sm">
-            {r.rules.map((x) => (
-              <li key={x.id} className="flex gap-2"><span className={x.outcome === 'pass' ? 'text-eligible' : x.outcome === 'fail' ? 'text-red-400' : 'text-confirm'}>{x.outcome === 'pass' ? '✓' : x.outcome === 'fail' ? '✗' : '?'}</span>{x.label_en}</li>
-            ))}
-            {r.scheme.required_docs.map((d) => {
-              const miss = r.missing_docs.includes(d);
-              return <li key={d} className="flex gap-2"><span className={miss ? 'text-red-400' : 'text-eligible'}>{miss ? '✗' : '✓'}</span>Document: {docLabel(d)}</li>;
-            })}
-          </motion.ul>
-        )}
-      </AnimatePresence>
-      {r.status !== 'not_eligible' && (
-        <div className="mt-3">
-          <p className="mb-2 text-xs text-muted">{r.scheme.how_to_apply_en}</p>
-          <a href={r.scheme.apply_url} target="_blank" rel="noreferrer noopener" className="grad-bg inline-block rounded-full px-4 py-2 text-sm font-semibold">How to apply</a>
-        </div>
-      )}
+    <motion.div layout="position" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ ...spring, delay: Math.min(i, 8) * 0.04 }} className="scheme-row surface">
+      <button className="scheme-row-main" onClick={onOpen}><span className="scheme-row-name">{r.scheme.name.en}</span><span className={`scheme-status ${b.c}`}>{b.t(r)}</span></button>
+      <a className="scheme-row-apply" href={r.scheme.apply_url ?? r.scheme.source_url ?? '#scheme-details'} target={r.scheme.apply_url ? '_blank' : undefined} rel={r.scheme.apply_url ? 'noreferrer noopener' : undefined}>How to apply ↗</a>
     </motion.div>
   );
+}
+
+export function SchemeDetail({ r, onBack }: { r: Result; onBack: () => void }) {
+  const b = BADGE[r.status];
+  const steps = r.scheme.how_to_apply_en.split(/\s*\|\s*|\s+(?=Step\s*\d+\s*[:.)-])/i).map((s) => s.trim()).filter(Boolean);
+  return <main className="scheme-detail page-width"><button className="text-action" onClick={onBack}>← Back to schemes</button><p className="eyebrow">{r.scheme.category}</p><h1>{r.scheme.name.en}</h1><span className={`scheme-status ${b.c}`}>{b.t(r)}</span><p className="scheme-detail-summary">{r.scheme.summary_en}</p><section><h2>What this scheme offers</h2><p>{r.scheme.benefit.label_en || r.scheme.summary_en}</p></section>{r.unknown_labels.length > 0 && <section><h2>What still needs confirmation</h2><ul>{r.unknown_labels.map((x) => <li key={x}>{x}</li>)}</ul></section>}<section><h2>Documents to prepare</h2>{r.scheme.required_docs.length ? <ul className="document-list">{r.scheme.required_docs.map((x, index) => <li key={`${x}-${index}`}>{docLabel(x)}</li>)}</ul> : <p>Check the official page for the required documents.</p>}</section><section><h2>How to apply</h2><ol className="application-steps">{steps.map((x, index) => <li key={index}>{x.replace(/^Step\s*\d+\s*[:.)-]?\s*/i, '')}</li>)}</ol></section><a className="primary-action" href={r.scheme.apply_url ?? r.scheme.source_url ?? '#'} target="_blank" rel="noreferrer noopener">Open official scheme page ↗</a><p className="scheme-detail-note">Final eligibility and requirements are confirmed by the relevant department.</p></main>;
 }
 
 export function Narrator() {
@@ -348,6 +315,12 @@ export function Narrator() {
   );
 }
 
+export function FollowUp() {
+  const plan = useStore((s) => s.questions);
+  if (!plan) return null;
+  return <section className="mt-4 rounded-xl border border-cyan/30 bg-cyan/10 p-4" aria-live="polite"><p className="text-sm font-semibold">{plan.message}</p>{plan.questions.map((question) => <p key={question.id} className="mt-2 text-sm text-muted">• {question.text}</p>)}{plan.questions.length > 0 && <p className="mt-3 text-sm font-medium text-cyan">Tap the microphone and answer in your own words.</p>}</section>;
+}
+
 export function Toasts() {
   const toasts = useStore((s) => s.toasts);
   const dismiss = useStore((s) => s.dismissToast);
@@ -356,10 +329,10 @@ export function Toasts() {
       <AnimatePresence>
         {toasts.map((t) => (
           <motion.div key={t.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="alert"
-            className="flex items-center gap-3 rounded-xl border border-red-400/30 bg-[#2A1417] p-3 text-sm">
+            className="app-toast flex items-center gap-3 rounded-xl p-4 text-base">
             <span className="flex-1">{t.message}</span>
-            {t.retry && <button className="font-semibold text-cyan" onClick={() => { t.retry?.(); dismiss(t.id); }}>Retry</button>}
-            <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="text-muted">✕</button>
+            {t.retry && <button className="font-semibold" onClick={() => { t.retry?.(); dismiss(t.id); }}>Retry</button>}
+            <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="app-toast-dismiss">✕</button>
           </motion.div>
         ))}
       </AnimatePresence>

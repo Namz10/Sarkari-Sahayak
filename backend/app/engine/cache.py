@@ -1,4 +1,4 @@
-"""Persistent disk & memory caching layer for Sarkari Sahayak (SPEC section 5.4).
+"""Bounded, process-local cache for expensive Sarvam API calls.
 
 Caches expensive upstream Sarvam API calls:
 - STT (audio hash -> transcript + lang)
@@ -8,24 +8,23 @@ Caches expensive upstream Sarvam API calls:
 - Bulbul TTS (script+voice hash -> audio_b64)
 - Translation (text+src+tgt hash -> translated_text)
 
-Provides sub-millisecond responses for repeated requests, saves user credits,
-and guarantees resilience during demos.
+Avoids writing transcripts, profile fields, document extraction, or generated
+audio to disk. Cache entries expire with the process and have a strict memory
+budget so repeated requests cannot grow the serverless function without bound.
 """
 from __future__ import annotations
 
+from collections import OrderedDict
 import hashlib
 import json
-import os
 import threading
-from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[3]
-CACHE_DIR = ROOT / ".cache" / "sarvam_cache"
-
 _lock = threading.Lock()
-_memory_cache: dict[str, Any] = {}
-_MAX_MEMORY_ITEMS = 1000
+_memory_cache: OrderedDict[str, tuple[Any, int]] = OrderedDict()
+_memory_cache_bytes = 0
+_MAX_MEMORY_ITEMS = 256
+_MAX_MEMORY_BYTES = 48 * 1024 * 1024
 
 _stats = {
     "hits": 0,
@@ -48,27 +47,14 @@ def hash_key(*parts: Any) -> str:
 
 
 def get(namespace: str, key: str) -> Any | None:
-    """Retrieve an item from memory or disk cache."""
+    """Retrieve a process-local cached value and refresh its LRU position."""
     composite_key = f"{namespace}:{key}"
     with _lock:
         if composite_key in _memory_cache:
             _stats["hits"] += 1
-            return _memory_cache[composite_key]
-
-    # Try disk cache
-    file_path = CACHE_DIR / namespace / f"{key}.json"
-    if file_path.exists():
-        try:
-            content = file_path.read_text(encoding="utf-8")
-            data = json.loads(content)
-            with _lock:
-                if len(_memory_cache) >= _MAX_MEMORY_ITEMS:
-                    _memory_cache.pop(next(iter(_memory_cache)), None)
-                _memory_cache[composite_key] = data
-                _stats["hits"] += 1
-            return data
-        except Exception:  # noqa: BLE001
-            pass
+            entry = _memory_cache.pop(composite_key)
+            _memory_cache[composite_key] = entry
+            return entry[0]
 
     with _lock:
         _stats["misses"] += 1
@@ -76,24 +62,28 @@ def get(namespace: str, key: str) -> Any | None:
 
 
 def set_val(namespace: str, key: str, value: Any) -> None:
-    """Store an item in memory and disk cache."""
+    """Store JSON-compatible values while respecting strict item and byte caps."""
+    global _memory_cache_bytes
     composite_key = f"{namespace}:{key}"
-    with _lock:
-        if len(_memory_cache) >= _MAX_MEMORY_ITEMS:
-            _memory_cache.pop(next(iter(_memory_cache)), None)
-        _memory_cache[composite_key] = value
-        _stats["writes"] += 1
-
-    # Persist to disk asynchronously or safely
     try:
-        ns_dir = CACHE_DIR / namespace
-        ns_dir.mkdir(parents=True, exist_ok=True)
-        file_path = ns_dir / f"{key}.json"
-        temp_path = ns_dir / f"{key}.tmp"
-        temp_path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
-        os.replace(temp_path, file_path)
-    except Exception:  # noqa: BLE001
-        pass
+        value_bytes = len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    except (TypeError, ValueError):
+        return
+    if value_bytes > _MAX_MEMORY_BYTES:
+        return
+    with _lock:
+        old_value = _memory_cache.pop(composite_key, None)
+        if old_value:
+            _memory_cache_bytes -= old_value[1]
+        while _memory_cache and (
+            len(_memory_cache) >= _MAX_MEMORY_ITEMS
+            or _memory_cache_bytes + value_bytes > _MAX_MEMORY_BYTES
+        ):
+            _, (_, evicted_bytes) = _memory_cache.popitem(last=False)
+            _memory_cache_bytes -= evicted_bytes
+        _memory_cache[composite_key] = (value, value_bytes)
+        _memory_cache_bytes += value_bytes
+        _stats["writes"] += 1
 
 
 def get_stats() -> dict[str, int]:
@@ -102,13 +92,12 @@ def get_stats() -> dict[str, int]:
         return dict(_stats, memory_items=len(_memory_cache))
 
 
-def clear(clear_disk: bool = False) -> None:
-    """Clear memory cache, and optionally purge on-disk cache files."""
+def clear() -> None:
+    """Clear all process-local cache entries and counters."""
+    global _memory_cache_bytes
     with _lock:
         _memory_cache.clear()
+        _memory_cache_bytes = 0
         _stats["hits"] = 0
         _stats["misses"] = 0
         _stats["writes"] = 0
-    if clear_disk and CACHE_DIR.exists():
-        import shutil
-        shutil.rmtree(CACHE_DIR, ignore_errors=True)

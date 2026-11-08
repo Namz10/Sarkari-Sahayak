@@ -1,72 +1,56 @@
 from app.engine.match import compact_results, load_schemes, match_all
-from app.models import Dependent, Profile
+from app.models import Profile
 
 
-def by_id(resp):
-    return {r.scheme.id: r for r in resp.results}
+def test_verified_catalogue_loads():
+    assert len(load_schemes()) >= 4_000
 
 
-def ramesh(**kw):
-    base = dict(
-        age=34, gender="male", state="MH", occupation="gig_driver",
-        monthly_income_inr=15000, household_size=5,
-        dependents=[
-            Dependent(relation="mother", age=68, gender="female"),
-            Dependent(relation="daughter", age=6, gender="female"),
-            Dependent(relation="son", age=3, gender="male"),
-        ],
-        has_bank_account=True, is_income_tax_payer=False,
-        is_epfo_esic_nps_member=False, docs_held=["aadhaar"],
+def test_event_only_schemes_are_not_suggested_for_general_income_need():
+    profile = Profile(age=34, state="MH", occupation="gig_driver", monthly_income_inr=15_000, needs=["income"])
+    results = match_all(profile).results
+    assert results
+    assert all("accident" not in result.scheme.name.en.lower() for result in results)
+
+
+def test_state_filter_and_result_contract():
+    response = match_all(Profile(state="MP", needs=["farmer"]))
+    assert response.results
+    assert response.results[0].status == "confirm"
+    assert compact_results(response)[0]["id"]
+
+
+def test_sparse_profile_stays_conservative():
+    response = match_all(Profile())
+    assert response.results == []
+
+
+def test_complete_old_age_pension_profile_can_be_marked_eligible():
+    profile = Profile(
+        name="Ramesh Patil", age=68, state="MH", occupation="retired",
+        needs=["income"], ration_card_type="bpl", receives_other_pension=False,
     )
-    base.update(kw)
-    return Profile(**base)
+    result = next(r for r in match_all(profile).results if r.scheme.id == "igoapsm")
+    assert result.status == "eligible"
+    assert result.unknown_labels == []
+    assert len(result.scheme.required_docs) == 10
+    assert "Identity proof i" not in result.scheme.required_docs
+    assert "e" not in result.scheme.required_docs
 
 
-def test_ten_schemes_load():
-    assert len(load_schemes()) == 10
+def test_existing_pension_prevents_old_age_pension_eligibility():
+    profile = Profile(
+        age=68, state="MH", occupation="retired", needs=["income"],
+        ration_card_type="bpl", receives_other_pension=True,
+    )
+    result = next(r for r in match_all(profile).results if r.scheme.id == "igoapsm")
+    assert result.status == "not_eligible"
+    assert result.rules[0].outcome == "fail"
+    assert result.failed_labels == ["Already receiving another pension"]
 
 
-def test_ramesh():
-    r = by_id(match_all(ramesh()))
-    for sid in ("e_shram", "apy", "pmsby", "pmjjby"):
-        assert r[sid].status == "almost", sid
-        assert r[sid].missing_docs == ["bank_passbook"]
-    assert r["pmjay"].status == "confirm"
-    assert r["ignoaps"].status == "confirm"
-    assert r["majhi_ladki_bahin"].status == "not_eligible"
-    assert r["ladli_behna"].status == "not_eligible"
-
-    resp = match_all(ramesh(), docs_held=["bank_passbook"])
-    r = by_id(resp)
-    for sid in ("e_shram", "apy", "pmsby", "pmjjby"):
-        assert r[sid].status == "eligible", sid
-    assert resp.pocket.eligible.cover == 600000
-    assert resp.results[0].status == "eligible"
-    assert compact_results(resp)[0]["id"]
-
-
-def test_sita():
-    p = Profile(age=45, gender="female", state="MP", occupation="farmer",
-                owns_farmland=True, monthly_income_inr=10000,
-                is_income_tax_payer=False, has_bank_account=True)
-    r = by_id(match_all(p))
-    assert r["ladli_behna"].status != "not_eligible"
-    assert r["apy"].status == "not_eligible"
-    assert r["majhi_ladki_bahin"].status == "not_eligible"
-
-
-def test_kumar():
-    p = Profile(age=62, gender="male", state="OD", occupation="retired",
-                ration_card_type="bpl",
-                docs_held=["aadhaar", "age_proof", "ration_card", "bank_passbook"])
-    r = by_id(match_all(p))
-    assert r["ignoaps"].status == "eligible"
-    assert r["ladli_behna"].status == "not_eligible"
-
-
-def test_sparse_profile():
-    resp = match_all(Profile())
-    statuses = {r.status for r in resp.results}
-    assert "confirm" in statuses
-    assert sum(r.status == "confirm" for r in resp.results) >= 7
-    assert resp.pocket.eligible.cover == 0
+def test_missing_pension_facts_require_confirmation():
+    profile = Profile(age=68, state="MH", occupation="retired", needs=["income"], ration_card_type="bpl")
+    result = next(r for r in match_all(profile).results if r.scheme.id == "igoapsm")
+    assert result.status == "confirm"
+    assert "Not receiving another pension" in result.unknown_labels

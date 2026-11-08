@@ -223,3 +223,9 @@ __marimo__/
 .cache/
 *.tmp
 spend.log
+
+# Ignore other CSV exports, but keep the production source file tracked inside
+# the Vercel backend service root so the matcher can load it after deployment.
+
+*.csv
+!/backend/schemes.csv

@@ -17,6 +17,10 @@ export interface Profile {
   ration_card_type: RationType | null;
   docs_held: string[];
   inferred: string[];
+  needs: string[];
+  name?: string | null;
+  aadhaar_linked_to_bank?: boolean | null;
+  receives_other_pension?: boolean | null;
 }
 export type Status = 'eligible' | 'almost' | 'confirm' | 'not_eligible';
 export interface Scheme {
@@ -55,6 +59,7 @@ export interface Health {
 export interface Persona { id: string; name: string; language_code: string; transcript: string; blurb: string }
 export interface Transcribed { transcript: string; language_code: string; duration_s: number }
 export interface MatchResponse { results: Result[]; pocket: Pocket; schemes_version: string; verified_on: string }
+export interface QuestionPlan { done: boolean; message: string; questions: { id: string; text: string }[]; prompt?: string }
 export interface DocResponse {
   doc_type: string;
   confidence: number;
@@ -131,8 +136,23 @@ export const api = {
   },
   profile: (transcript: string, language_code: string, signal?: AbortSignal) =>
     call<{ profile: Profile; notes: string[]; language_code?: string }>('/api/profile', json({ transcript, language_code }, signal)),
+  report: async (profile: Profile, results: Result[], filter: 'eligible' | 'all'): Promise<Blob> => {
+    const response = await fetch('/api/report.pdf', json({ profile, results, filter }));
+    if (!response.ok) {
+      let message = 'Could not create the PDF. Please try again.';
+      try { const payload = await response.json(); message = payload?.error?.message ?? message; } catch { /* non-JSON error */ }
+      throw new ApiError(message, 'pdf_error', true);
+    }
+    return response.blob();
+  },
   match: (profile: Profile, docs_held: string[], signal?: AbortSignal) =>
     call<MatchResponse>('/api/match', json({ profile, docs_held }, signal)),
+  questions: (profile: Profile, language_code: string, attempts: number, context: string, asked_fields: string[], signal?: AbortSignal) =>
+    call<QuestionPlan>('/api/questions', json({ profile, language_code, attempts, context, asked_fields }, signal)),
+  speak: async (text: string, language_code: string) => {
+    const response = await call<{ audio_b64: string }>('/api/speak', json({ text, language_code }));
+    return response.audio_b64;
+  },
   document: (image: Blob, language_code: string, signal?: AbortSignal) => {
     const fd = new FormData();
     fd.append('image', image, 'doc.jpg');

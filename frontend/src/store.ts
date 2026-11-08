@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api, ApiError, type DocResponse, type Health, type Narration, type Persona, type Pocket, type Profile, type Result } from './api';
+import { api, ApiError, type DocResponse, type Health, type Narration, type Persona, type Pocket, type Profile, type QuestionPlan, type Result } from './api';
 import { Recorder, TooShortError, blobToWav16k, downscaleImage } from './lib/audio';
 import { b64ToUrl } from './lib/util';
 
@@ -8,7 +8,8 @@ export type Phase = 'IDLE' | 'RECORDING' | 'TRANSCRIBING' | 'UNDERSTANDING' | 'R
 export const emptyProfile = (): Profile => ({
   age: null, gender: null, state: null, occupation: null, monthly_income_inr: null, household_size: null,
   dependents: [], pregnant_or_lactating: null, owns_farmland: null, is_income_tax_payer: null,
-  is_epfo_esic_nps_member: null, has_bank_account: null, ration_card_type: null, docs_held: [], inferred: [],
+  is_epfo_esic_nps_member: null, has_bank_account: null, ration_card_type: null, docs_held: [], inferred: [], needs: [],
+  name: null, aadhaar_linked_to_bank: null, receives_other_pension: null,
 });
 
 interface Toast { id: number; message: string; retry?: () => void }
@@ -32,6 +33,12 @@ interface State {
   matching: boolean;
   doc: DocResponse | null;
   toasts: Toast[];
+  questions: QuestionPlan | null;
+  questionAttempts: number;
+  conversation: string[];
+  askedFields: string[];
+  finalizing: boolean;
+  finishQuestions: () => Promise<void>;
   init: () => void;
   setLangHint: (c: string | null) => void;
   toggleMic: () => Promise<void>;
@@ -87,16 +94,15 @@ export const useStore = create<State>((set, get) => {
     } catch (e) { set({ narrating: false }); fail(e, () => void narrate()); }
   };
 
-  const match = async (profile: Profile, first: boolean) => {
+  const match = async (profile: Profile) => {
     set({ matching: true });
     try {
       const m = await api.match(profile, profile.docs_held, newCtrl());
-      set({ profile, results: m.results, pocket: m.pocket, verifiedOn: m.verified_on, phase: 'RESULTS', matching: false });
+      set({ profile, results: m.results, pocket: m.pocket, verifiedOn: m.verified_on, phase: 'RESULTS', matching: false, questions: null, finalizing: false });
       void narrate();
-      void first;
     } catch (e) {
       set({ matching: false, phase: get().results.length ? 'RESULTS' : 'IDLE' });
-      fail(e, () => void match(profile, first));
+      fail(e, () => void match(profile));
     }
   };
 
@@ -105,7 +111,28 @@ export const useStore = create<State>((set, get) => {
     try {
       const r = await api.profile(transcript, lang, newCtrl());
       if (r.language_code) set({ langCode: r.language_code });
-      await match(r.profile, true);
+      const previous = get().profile;
+      const merged = previous ? {
+        ...previous,
+        ...Object.fromEntries(Object.entries(r.profile).filter(([, value]) => value !== null && (!Array.isArray(value) || value.length > 0))),
+        docs_held: Array.from(new Set([...previous.docs_held, ...r.profile.docs_held])),
+        inferred: Array.from(new Set([...previous.inferred, ...r.profile.inferred])),
+        needs: Array.from(new Set([...previous.needs, ...r.profile.needs])),
+      } as Profile : r.profile;
+      if (previous) set((s) => ({ questionAttempts: s.questionAttempts + 1 }));
+      const attempts = get().questionAttempts;
+      if (previous) set({ profile: merged, transcript, questionAttempts: attempts + 1 });
+      const conversation = [...get().conversation, transcript];
+      const askedFields = get().askedFields;
+      const plan = await api.questions(merged, get().langCode, previous ? attempts + 1 : 0, conversation.join('\n'), askedFields, newCtrl());
+      if (plan.questions[0]) set({ askedFields: [...askedFields, plan.questions[0].id] });
+      set({ conversation });
+      set({ questions: plan, phase: 'RESULTS', profile: merged, results: [], pocket: null });
+      if (plan.done || !plan.questions.length || (previous && attempts + 1 >= 2)) await get().finishQuestions();
+      else {
+        const spoken = await api.speak(plan.prompt ?? plan.questions.map((q) => q.text).join(' '), get().langCode);
+        if (spoken) { audio.src = `data:audio/wav;base64,${spoken}`; await audio.play().catch(() => undefined); }
+      }
     } catch (e) { set({ phase: 'IDLE' }); fail(e, () => void understand(transcript, lang)); }
   };
 
@@ -134,7 +161,12 @@ export const useStore = create<State>((set, get) => {
   return {
     phase: 'IDLE', langHint: null, langCode: 'hi-IN', transcript: '', profile: null, results: [], pocket: null,
     verifiedOn: '', health: null, personas: [], narration: null, narrating: false, audioUrl: '', playing: false,
-    progress: 0, matching: false, doc: null, toasts: [],
+    progress: 0, matching: false, doc: null, toasts: [], questions: null, questionAttempts: 0, finalizing: false, conversation: [], askedFields: [],
+    finishQuestions: async () => {
+      if (get().finalizing || !get().profile) return;
+      set({ finalizing: true, matching: true });
+      await match(get().profile!);
+    },
     init: () => {
       api.health().then((h) => set({ health: h, verifiedOn: h.verified_on })).catch(() => undefined);
       api.personas().then((p) => set({ personas: p })).catch(() => undefined);
@@ -158,7 +190,7 @@ export const useStore = create<State>((set, get) => {
       }
     },
     runTranscript: async (t, lang) => { unlockAudio(); await understand(t, lang); },
-    updateProfile: async (p) => { await match(p, false); },
+    updateProfile: async (p) => { await match(p); },
     scanFile: async (f) => {
       set({ phase: 'SCANNING', doc: null });
       try {
@@ -176,7 +208,7 @@ export const useStore = create<State>((set, get) => {
       }
       merged.docs_held = Array.from(new Set([...profile.docs_held, ...(doc.docs_held_add ?? []), ...(merged.docs_held ?? [])]));
       set({ doc: null, phase: 'RESULTS' });
-      await match(merged, false);
+      await match(merged);
     },
     cancelDoc: () => set({ doc: null, phase: 'RESULTS' }),
     togglePlay: () => {
@@ -191,8 +223,8 @@ export const useStore = create<State>((set, get) => {
     reset: () => {
       ctrl?.abort(); recorder.cancel(); audio?.pause();
       set({
-        phase: 'IDLE', transcript: '', profile: null, results: [], pocket: null, narration: null, audioUrl: '',
-        playing: false, progress: 0, doc: null, langHint: null, narrating: false, matching: false,
+        phase: 'IDLE', langCode: 'hi-IN', transcript: '', profile: null, results: [], pocket: null, verifiedOn: '', narration: null, audioUrl: '',
+        playing: false, progress: 0, doc: null, langHint: null, narrating: false, matching: false, questions: null, questionAttempts: 0, finalizing: false, conversation: [], askedFields: [],
       });
     },
   };

@@ -24,8 +24,8 @@ The full skillset from `https://github.com/sarvamai/skills` has been incorporate
 
 ### A. Sub-Millisecond Multi-Tier Caching ([`backend/app/engine/cache.py`](file:///d:/GitHub%20Repos/Sarvam/backend/app/engine/cache.py))
 * **The Problem:** Repeated audio clips, standard persona clicks (Ramesh, Lakshmi, Sita), and identical narration requests repeatedly triggered slow upstream API calls (3–8s latency each) and burned budget towards the `SPEND_CAP_INR`.
-* **The Solution:** A dual-tier in-memory LRU + persistent disk cache partitioned by capability (`stt`, `profile`, `doc`, `narrate`, `tts`, `translate`).
-* **The Impact:** Repeated queries respond in **< 2ms** at **₹0.00 cost**, with live metrics exposed on `GET /api/health`.
+* **The Solution:** A bounded process-local LRU cache partitioned by capability (`stt`, `profile`, `doc`, `narrate`, `tts`, `translate`). User transcripts, profiles, document extraction, and narration are not written to a disk cache.
+* **The Impact:** Repeated queries within a warm process reuse results without another upstream call. The cache is capped at 256 items / 48 MiB and disappears when the backend process exits; `GET /api/health` reports cache counts.
 
 ### B. Universal Audio Transcoding ([`backend/app/engine/audio.py`](file:///d:/GitHub%20Repos/Sarvam/backend/app/engine/audio.py))
 * **The Problem:** The previous code strictly checked `data.startswith(b"RIFF")`, returning HTTP 415 on mobile browsers (Safari recording AAC/MP4, Chrome recording WebM/Opus). Furthermore, duration was calculated using hardcoded byte offsets (`(len(data) - 44) / 32000`), which produced incorrect billing and timestamps for non-16kHz audio.

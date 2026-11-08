@@ -30,6 +30,10 @@ class Profile(BaseModel):
     ration_card_type: Optional[str] = None
     docs_held: list[str] = Field(default_factory=list, max_length=30)
     inferred: list[str] = Field(default_factory=list, max_length=30)
+    needs: list[str] = Field(default_factory=list, max_length=8)
+    name: Optional[str] = Field(default=None, max_length=120)
+    aadhaar_linked_to_bank: Optional[bool] = None
+    receives_other_pension: Optional[bool] = None
 
     @field_validator("state", mode="before")
     @classmethod

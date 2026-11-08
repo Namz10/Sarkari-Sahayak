@@ -1,7 +1,8 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useStore } from './store';
-import { BenefitPocket, LangChips, Narrator, Orb, PersonaPicker, ProfileChips, SchemeCard, Toasts, Transcript } from './components';
+import { BenefitPocket, LangChips, Narrator, Orb, PersonaPicker, ProfileChips, SchemeCard, SchemeDetail, Toasts, Transcript } from './components';
+import { api } from './api';
 
 const ScanSheet = lazy(() => import('./ScanSheet'));
 const Mark = () => <div className="brand-mark" aria-hidden="true"><span>सा</span></div>;
@@ -11,6 +12,8 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [notFor, setNotFor] = useState(false);
   const [portal, setPortal] = useState(false);
+  const [reportFilter, setReportFilter] = useState<'eligible' | 'all'>('all');
+  const [selectedSchemeId, setSelectedSchemeId] = useState<string | null>(null);
   const prevResultsLen = useRef(0);
   const input = useRef<HTMLInputElement>(null), gallery = useRef<HTMLInputElement>(null), workspace = useRef<HTMLElement>(null);
 
@@ -22,11 +25,34 @@ export default function App() {
     prevResultsLen.current = s.results.length;
   }, [s.results.length]);
 
-  const hasResults = s.results.length > 0;
+  const hasResults = s.results.length > 0 && !s.questions?.questions.length;
   const rank = { eligible: 0, almost: 1, confirm: 2, not_eligible: 3 } as const;
   const sorted = [...s.results].sort((a, b) => rank[a.status] - rank[b.status] || b.score - a.score);
   const yes = sorted.filter((r) => r.status !== 'not_eligible'), no = sorted.filter((r) => r.status === 'not_eligible');
+  const selectedScheme = sorted.find((r) => r.scheme.id === selectedSchemeId);
   const pick = (f?: File) => { if (f) { setFile(f); void s.scanFile(f); } };
+
+  const downloadReport = async () => {
+    if (!s.profile) return;
+    try {
+      const blob = await api.report(s.profile, sorted, reportFilter);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'sarkari-sahayak-scheme-guide.pdf';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('PDF download failed', error);
+    }
+  };
+
+  const newPerson = () => {
+    s.reset(); setFile(null); setNotFor(false); setReportFilter('all');
+    input.current && (input.current.value = ''); gallery.current && (gallery.current.value = '');
+    setPortal(true);
+    requestAnimationFrame(() => workspace.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
 
   const enter = () => {
     setPortal(true);
@@ -83,7 +109,7 @@ export default function App() {
         <aside><span className="safe-dot" /> Nothing is submitted on your behalf</aside>
       </section>
       <div className="portal-grid"><section className="listen-panel" aria-label="Tell us about yourself"><div className="step-label"><span>1</span><p><b>Tell us a little about yourself</b><small>Choose a language, then speak naturally.</small></p></div><LangChips /><Orb /><Transcript />{!hasResults && <PersonaPicker />}{s.phase === 'UNDERSTANDING' && <p className="finding-message">Reading your story and checking what may fit…</p>}{hasResults && <div className="profile-area"><div className="section-heading"><div><b>Your details</b><p>Tap anything to correct it</p></div><span>Step 2</span></div><ProfileChips /></div>}</section><aside className="help-panel"><div className="help-symbol">?</div><h2>Speak your way.</h2><p>You do not need to know scheme names, technical terms, or exactly which document you have.</p><p>For example: <q>I work as a driver in Pune and earn around ₹15,000 a month.</q></p><div className="privacy-note"><b>Private by design</b><span>We only use what is needed to check possible matches.</span></div></aside></div>
-      {hasResults && <section className="results" aria-live="polite"><div className="results-heading"><div><p className="eyebrow">Your results</p><h2>Here is what we found <em>for you.</em></h2></div><span>{yes.length} to explore</span></div><BenefitPocket /><Narrator /><div className="document-actions"><div><b>Have a document handy?</b><p>Scan it to make your checklist more accurate.</p></div><div><button onClick={() => input.current?.click()} className="secondary-action">Scan a document</button><button onClick={() => gallery.current?.click()} className="quiet-action">Choose from device</button></div><input ref={input} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} /><input ref={gallery} type="file" accept="image/*" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} /></div><div className="scheme-grid"><AnimatePresence>{yes.map((r, i) => <SchemeCard key={r.scheme.id} r={r} i={i} />)}</AnimatePresence></div>{no.length > 0 && <div className="not-for"><button onClick={() => setNotFor(!notFor)} aria-expanded={notFor}>Not a match right now <span>{no.length}</span> {notFor ? '−' : '+'}</button>{notFor && <ul>{no.map((r) => <li key={r.scheme.id}><b>{r.scheme.name.en}</b><span>{r.failed_labels.length ? r.failed_labels.join('; ') : 'Eligibility rules not met'}</span></li>)}</ul>}</div>}</section>}
+      {hasResults && (selectedScheme ? <SchemeDetail r={selectedScheme} onBack={() => setSelectedSchemeId(null)} /> : <section className="results" aria-live="polite"><div className="results-heading"><div><p className="eyebrow">Your results</p><h2>Here is what we found <em>for you.</em></h2></div><span>{yes.length} to explore</span></div><BenefitPocket /><Narrator /><div className="report-actions"><label htmlFor="report-filter">Download report</label><select id="report-filter" value={reportFilter} onChange={(e) => setReportFilter(e.target.value as 'eligible' | 'all')}><option value="eligible">Eligible schemes only</option><option value="all">Eligible and confirm schemes</option></select><button className="secondary-action" onClick={() => void downloadReport()}>Download PDF</button><button className="quiet-action" onClick={newPerson}>Start another person</button></div><div className="document-actions"><div><b>Have a document handy?</b><p>Scan it to make your checklist more accurate.</p></div><div><button onClick={() => input.current?.click()} className="secondary-action">Scan a document</button><button onClick={() => gallery.current?.click()} className="quiet-action">Choose from device</button></div><input ref={input} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} /><input ref={gallery} type="file" accept="image/*" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} /></div><div className="scheme-list"><AnimatePresence>{yes.map((r, i) => <SchemeCard key={r.scheme.id} r={r} i={i} onOpen={() => setSelectedSchemeId(r.scheme.id)} />)}</AnimatePresence></div>{no.length > 0 && <div className="not-for"><button onClick={() => setNotFor(!notFor)} aria-expanded={notFor}>Not a match right now <span>{no.length}</span> {notFor ? '−' : '+'}</button>{notFor && <ul>{no.map((r) => <li key={r.scheme.id}><b>{r.scheme.name.en}</b><span>{r.failed_labels.length ? r.failed_labels.join('; ') : 'Eligibility rules not met'}</span></li>)}</ul>}</div>}</section>)}
     </motion.main>}</AnimatePresence>
     <footer className="site-footer"><span>Indicative guidance only. Final eligibility is decided by the relevant department.</span>{(s.health?.verified_on || s.verifiedOn) && <span>Scheme data checked: {s.verifiedOn || s.health?.verified_on}</span>}<button onClick={s.reset}>Clear my data</button></footer><Suspense fallback={null}>{file && <ScanSheet file={file} onClose={() => setFile(null)} />}</Suspense><Toasts />
   </div>;
